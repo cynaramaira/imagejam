@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Redimensionador de Imagens 1920x1080</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+            color: #333;
+        }
+        .container {
+            background-color: white;
+            border-radius: 10px;
+            padding: 30px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #2c3e50;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .upload-area {
+            border: 2px dashed #3498db;
+            border-radius: 8px;
+            padding: 40px 20px;
+            text-align: center;
+            margin-bottom: 20px;
+            background-color: #f8fafc;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .upload-area:hover {
+            background-color: #e9f5ff;
+        }
+        .upload-area.drag-over {
+            background-color: #e1f0fa;
+            border-color: #2980b9;
+        }
+        .hidden {
+            display: none;
+        }
+        #preview {
+            max-width: 100%;
+            margin: 20px 0;
+            text-align: center;
+        }
+        #preview img {
+            max-width: 100%;
+            max-height: 300px;
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        .btn {
+            background-color: #3498db;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            font-size: 16px;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        .btn:hover {
+            background-color: #2980b9;
+        }
+        .btn:disabled {
+            background-color: #95a5a6;
+            cursor: not-allowed;
+        }
+        .download-btn {
+            display: block;
+            width: 100%;
+            margin-top: 20px;
+            font-weight: bold;
+            background-color: #27ae60;
+            text-decoration: none;
+            text-align: center;
+        }
+        .download-btn:hover {
+            background-color: #219955;
+        }
+        .instructions {
+            margin-top: 30px;
+            padding: 15px;
+            background-color: #f9f9f9;
+            border-radius: 5px;
+            border-left: 4px solid #3498db;
+        }
+        .instructions h3 {
+            margin-top: 0;
+            color: #2c3e50;
+        }
+        .instructions ol {
+            padding-left: 20px;
+        }
+        .status {
+            margin-top: 10px;
+            padding: 10px;
+            border-radius: 5px;
+            text-align: center;
+        }
+        .success {
+            background-color: #d4edda;
+            color: #155724;
+        }
+        .working {
+            background-color: #fff3cd;
+            color: #856404;
+        }
+        .error {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Redimensionador de Imagens</h1>
+
+        <div id="uploadArea" class="upload-area">
+            <p><strong>Clique aqui para selecionar uma imagem</strong><br>ou arraste e solte a imagem aqui</p>
+            <p><small>Qualquer imagem será automaticamente redimensionada para 1920x1080</small></p>
+            <input type="file" id="fileInput" accept="image/*" class="hidden">
+        </div>
+
+        <div id="statusMessage" class="status hidden"></div>
+
+        <div id="preview" class="hidden">
+            <h3>Pré-visualização:</h3>
+            <img id="previewImage" src="">
+            <p>Dimensões: <span id="dimensions"></span> (imagem cortada para se ajustar)</p>
+            <button id="downloadBtn" class="btn download-btn">Baixar imagem (JPG 1920x1080)</button>
+        </div>
+
+        <div class="instructions">
+            <h3>Como usar:</h3>
+            <ol>
+                <li>Clique na área tracejada acima ou arraste uma imagem para ela</li>
+                <li>A imagem será automaticamente redimensionada para 1920x1080</li>
+                <li>Clique no botão "Baixar imagem" para salvar o resultado</li>
+            </ol>
+        </div>
+    </div>
+    <script>
+        // Variável global para armazenar a URL da imagem
+        let imageDataUrl = null;
+
+        // Elementos DOM
+        const uploadArea = document.getElementById('uploadArea');
+        const fileInput = document.getElementById('fileInput');
+        const preview = document.getElementById('preview');
+        const previewImage = document.getElementById('previewImage');
+        const downloadBtn = document.getElementById('downloadBtn');
+        const dimensions = document.getElementById('dimensions');
+        const statusMessage = document.getElementById('statusMessage');
+
+        // Função para mostrar mensagens de status
+        function showStatus(message, type) {
+            statusMessage.textContent = message;
+            statusMessage.className = `status ${type}`;
+            statusMessage.classList.remove('hidden');
+        }
+
+        // Função para limpar mensagens de status
+        function clearStatus() {
+            statusMessage.classList.add('hidden');
+        }
+
+        // Função para lidar com o download
+        function handleDownload() {
+            if (!imageDataUrl) {
+                showStatus('Nenhuma imagem para baixar', 'error');
+                return;
+            }
+
+            showStatus('Iniciando download...', 'working');
+
+            fetch(imageDataUrl)
+                .then(res => res.blob())
+                .then(blob => {
+                    saveAs(blob, 'imagem-redimensionada.jpg');
+                    showStatus('Download concluído!', 'success');
+                })
+                .catch(err => {
+                    console.error('Erro ao baixar:', err);
+                    showStatus('Erro ao iniciar o download.', 'error');
+                });
+        }
+
+        // Manipular seleção de arquivo
+        function handleFileSelect(e) {
+            const file = fileInput.files[0];
+            if (!file) return;
+
+            if (!file.type.match('image.*')) {
+                showStatus('Por favor, selecione apenas arquivos de imagem.', 'error');
+                return;
+            }
+
+            clearStatus();
+            showStatus('Processando imagem...', 'working');
+
+            // Criar URL da imagem e redimensionar
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const img = new Image();
+                img.onload = function() {
+                    // Criar canvas para redimensionar
+                    const canvas = document.createElement('canvas');
+                    canvas.width = 1920;
+                    canvas.height = 1080;
+
+                    // Desenhar imagem redimensionada
+                    const ctx = canvas.getContext('2d');
+
+                    // Preencher com fundo branco (opcional - para imagens transparentes)
+                    ctx.fillStyle = 'white';
+                    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+                    // Calcular proporções de redimensionamento (usando máximo para cortar em vez de ajustar)
+                    const ratio = Math.max(
+                        canvas.width / img.width,
+                        canvas.height / img.height
+                    );
+
+                    // Calcular área de corte
+                    const sw = canvas.width / ratio;
+                    const sh = canvas.height / ratio;
+                    const sx = (img.width - sw) / 2;
+                    const sy = (img.height - sh) / 2;
+
+                    // Desenhar a imagem cortada e redimensionada
+                    ctx.drawImage(
+                        img,
+                        sx, sy, sw, sh,
+                        0, 0, canvas.width, canvas.height
+                    );
+
+                    // Mostrar pré-visualização
+                    imageDataUrl = canvas.toDataURL('image/jpeg', 0.9);
+                    previewImage.src = imageDataUrl;
+                    dimensions.textContent = `1920 x 1080 pixels`;
+
+                    // Exibir área de pré-visualização
+                    preview.classList.remove('hidden');
+                    clearStatus();
+                    showStatus('Imagem redimensionada com sucesso!', 'success');
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+
+        // Inicialização de event listeners
+        fileInput.addEventListener('change', handleFileSelect);
+        uploadArea.addEventListener('click', () => fileInput.click());
+        downloadBtn.addEventListener('click', handleDownload);
+
+        // Configurar drag and drop
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            uploadArea.addEventListener(eventName, preventDefaults, false);
+        });
+
+        function preventDefaults(e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+
+        ['dragenter', 'dragover'].forEach(eventName => {
+            uploadArea.addEventListener(eventName, () => {
+                uploadArea.classList.add('drag-over');
+            }, false);
+        });
+
+        ['dragleave', 'drop'].forEach(eventName => {
+            uploadArea.addEventListener(eventName, () => {
+                uploadArea.classList.remove('drag-over');
+            }, false);
+        });
+
+        uploadArea.addEventListener('drop', (e) => {
+            const dt = e.dataTransfer;
+            const files = dt.files;
+            if (files.length) {
+                fileInput.files = files;
+                handleFileSelect(e);
+            }
+        }, false);
+    </script>
+</body>
+</html>
